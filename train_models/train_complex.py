@@ -1,9 +1,6 @@
 import sys
 sys.path.append("..")
 import config.Config
-import sys
-sys.path.append("..")
-import config.Config
 import models
 import tensorflow as tf
 import numpy as np
@@ -51,7 +48,7 @@ def main(_):
 
 
     # Set the knowledge embedding model
-    con.init(models.TransD)
+    con.init(models.ComplEx)
     # Train the model.
     con.train()
     con.save_parameters()
@@ -62,4 +59,3 @@ def main(_):
 
 if __name__ == '__main__':
     app.run()
-

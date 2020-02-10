@@ -1,9 +1,6 @@
 import sys
 sys.path.append("..")
 import config.Config
-import sys
-sys.path.append("..")
-import config.Config
 import models
 import tensorflow as tf
 import numpy as np
@@ -62,4 +59,3 @@ def main(_):
 
 if __name__ == '__main__':
     app.run()
-
