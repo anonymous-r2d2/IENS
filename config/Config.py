@@ -12,7 +12,7 @@ import json
 
 class Config(object):
 	'''
-	use ctypes to call C functions from python and set essential parameters.
+	
 	'''
 	def __init__(self, config):
 		'''
@@ -32,12 +32,12 @@ class Config(object):
 		self.train_epochs = config.epochs
 		self.margin = config.margin
 		
+		self.neg_mode = config.neg_mode
 		self.read_neg_samples = True
 		
 		self.mu = 5
 		self.theta = 0.5
 		self.beta = 0.25
-		
 		
 		self.optimizer = None
 	
@@ -182,7 +182,6 @@ class Config(object):
 		return
 		
 		
-
 	def get_neg_head(self, h, t, r):
 		'''
 
@@ -191,9 +190,9 @@ class Config(object):
 		:param r:
 		:return:
 		'''
-		_h = 0
-		_sim = 0
-		sampled_ent = random.sample(range(self.ent_num), 10)
+		sampled_ent = random.sample(range(self.ent_num), self.neg_num)
+		tmp_neg_samples = []
+		
 		for i in sampled_ent:
 			indicate = 1.0 if self.head_rel[i][r] == 1 else 0.0
 			type_sim = (self.mu + 1)*((float)(np.sum(self.ent_type[h] & self.ent_type[i]))) / \
@@ -201,11 +200,9 @@ class Config(object):
 			head_rel_sim = (float)(np.sum(self.head_rel[h] & self.head_rel[i])) / \
 						   (float)(np.sum(self.head_rel[h] | self.head_rel[i])) * \
 						   (self.theta + indicate) / (self.theta + 1.0)
-			sim = self.theta * type_sim + (1 - self.theta) * head_rel_sim
-			if sim > _sim:
-				_sim = sim
-				_h = i
-		return (_h, t, r)
+			tmp_neg_samples.append((i, t, r, type_sim, head_rel_sim))
+
+		return tmp_neg_samples
 
 	def get_neg_tail(self, h, t, r):
 		'''
@@ -215,9 +212,9 @@ class Config(object):
 		:param r:
 		:return:
 		'''
-		_t = 0
-		_sim = 0
-		sampled_ent = random.sample(range(self.ent_num), 10)
+		sampled_ent = random.sample(range(self.ent_num), self.neg_num)
+		tmp_neg_samples = []
+		
 		for i in sampled_ent:
 			indicate = 1.0 if self.tail_rel[i][r] == 1 else 0.0
 			type_sim = (self.mu + 1) * ((float)(np.sum(self.ent_type[t] & self.ent_type[i]))) / \
@@ -227,11 +224,9 @@ class Config(object):
 			tail_rel_sim = (float)(np.sum(self.tail_rel[t] & self.tail_rel[i])) / \
 						   (float)(np.sum(self.tail_rel[t] | self.tail_rel[i])) * \
 						   (self.theta + indicate) / (self.theta + 1.0)
-			sim = self.theta * type_sim + (1.0 - self.theta) * tail_rel_sim
-			if sim > _sim:
-				_sim = sim
-				_t = i
-		return (h, _t, r)
+			tmp_neg_samples.append((h, i, r, type_sim, tail_rel_sim))
+			
+		return tmp_neg_samples
 
 	def get_neg_sample(self, h, t, r):
 		'''
@@ -245,68 +240,28 @@ class Config(object):
 			return self.get_neg_head(h, t, r)
 		else:
 			return self.get_neg_tail(h, t, r)
-
+	
 	def make_neg_samples(self):
 		'''
-
+		
 		:return:
 		'''
-		self.train_neg_triples = []
-		self.test_neg_triples = []
-		self.valid_neg_triples = []
-		
-		if self.read_neg_samples:
-			rf = codecs.open(os.path.join(self.data_path, 'neg_train2id.txt'), 'r', encoding='utf8')
-			for line in rf:
-				h, t, r = line.strip().split()
-				self.train_neg_triples.append((h, t, r))
-			rf.close()
-			
-			rf = codecs.open(os.path.join(self.data_path, 'neg_test2id.txt'), 'r', encoding='utf8')
-			for line in rf:
-				h, t, r = line.strip().split()
-				self.test_neg_triples.append((h, t, r))
-			rf.close()
-			
-			rf = codecs.open(os.path.join(self.data_path, 'neg_valid2id.txt'), 'r', encoding='utf8')
-			for line in rf:
-				h, t, r = line.strip().split()
-				self.valid_neg_triples.append((h, t, r))
-			rf.close()
-			return
+		self.train_nhs = []
+		self.train_nts = []
+		self.train_nrs = []
+		self.train_type_sims = []
+		self.train_rel_sims = []
 		
 		for h, t, r in self.train_pos_triples:
-			# s = time.time()
-			self.train_neg_triples.append(self.get_neg_sample(h, t, r))
-			# print(time.time() - s)
+			neg_sample = self.get_neg_sample(h, t, r)
+			hs, ts, rs, type_sims, rel_sims = [list(item) for item in zip(*neg_sample)]
+			self.train_nhs.append(hs)
+			self.train_nts.append(ts)
+			self.train_nrs.append(rs)
+			self.train_type_sims.append(type_sims)
+			self.train_rel_sims.append(rel_sims)
 			
-		for h, t, r in self.test_pos_triples:
-			self.test_neg_triples.append(self.get_neg_sample(h, t, r))
 
-		for h, t, r in self.valid_pos_triples:
-			self.valid_neg_triples.append(self.get_neg_sample(h, t, r))
-			
-		self.save_neg_samples()
-			
-	def save_neg_samples(self):
-		'''
-		
-		:return:
-		'''
-		wf = codecs.open(os.path.join(self.data_path, 'neg_train2id.txt'), 'w', encoding='utf8')
-		for (h, t, r) in self.train_neg_triples:
-			wf.write("{}\t{}\t{}\n".format(h, t, r))
-		wf.close()
-		
-		wf = codecs.open(os.path.join(self.data_path, 'neg_test2id.txt'), 'w', encoding='utf8')
-		for (h, t, r) in self.test_neg_triples:
-			wf.write("{}\t{}\t{}\n".format(h, t, r))
-		wf.close()
-		
-		wf = codecs.open(os.path.join(self.data_path, 'neg_valid2id.txt'), 'w', encoding='utf8')
-		for (h, t, r) in self.valid_neg_triples:
-			wf.write("{}\t{}\t{}\n".format(h, t, r))
-		wf.close()
 		
 	def make_data(self):
 		'''
@@ -325,13 +280,8 @@ class Config(object):
 		self.make_neg_samples()
 		
 		self.train_ph, self.train_pt, self.train_pr = zip(*self.train_pos_triples)
-		self.train_nh, self.train_nt, self.train_nr = zip(*self.train_neg_triples)
-		
 		self.test_ph, self.test_pt, self.test_pr = zip(*self.test_pos_triples)
-		self.test_nh, self.test_nt, self.test_nr = zip(*self.test_neg_triples)
-		
 		self.valid_ph, self.valid_pt, self.valid_pr = zip(*self.valid_pos_triples)
-		self.valid_nh, self.valid_nt, self.valid_nr = zip(*self.valid_neg_triples)
 		
 
 	def find(self, h, t, r):
@@ -366,8 +316,15 @@ class Config(object):
 						self.optimizer = tf.train.AdamOptimizer(self.alpha)
 					else:
 						self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
-					grads_and_vars = self.optimizer.compute_gradients(self.trainModel.loss)
-					self.train_op = self.optimizer.apply_gradients(grads_and_vars)
+						
+					embed_var_list = [var for var in tf.trainable_variables() if 'embed' in var.name]
+					neg_var_list = [var for var in tf.trainable_variables() if 'neg' in var.name]
+					
+					self.embed_train_op = self.optimizer.minimize(self.trainModel.loss, var_list=embed_var_list)
+					self.neg_train_op = self.optimizer.minimize(self.trainModel.neg_loss, var_list=neg_var_list)
+					# grads_and_vars = self.optimizer.compute_gradients(self.trainModel.loss)
+					# self.train_op = self.optimizer.apply_gradients(grads_and_vars)
+					
 				self.saver = tf.train.Saver()
 				self.sess.run(tf.global_variables_initializer())
 	
@@ -422,22 +379,43 @@ class Config(object):
 		with self.graph.as_default():
 			with self.sess.as_default():
 				for step in range(self.train_epochs):
-					_loss = .0
+					_embed_loss = .0
+					_neg_loss = .0
 					for i in range(self.train_num//self.batch_size):
 						batch_ph = self.train_ph[i*self.batch_size: (i+1)*self.batch_size]
 						batch_pt = self.train_pt[i * self.batch_size: (i + 1) * self.batch_size]
 						batch_pr = self.train_pr[i * self.batch_size: (i + 1) * self.batch_size]
-						batch_nh = self.train_nh[i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_nt = self.train_nt[i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_nr = self.train_nr[i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_nhs = self.train_nhs[
+									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_nts = self.train_nts[
+									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_nrs = self.train_nrs[
+									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_type_sims = self.train_type_sims[
+									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_rel_sims = self.train_rel_sims[
+									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						
+						print(batch_ph)
+						print(batch_pt)
+						print(batch_pr)
+						print(batch_nhs)
+						print(batch_nts)
+						print(batch_nrs)
+						print(batch_type_sims)
+						print(batch_rel_sims)
 						
 						feed_dict = {self.trainModel.pos_h: batch_ph, self.trainModel.pos_t: batch_pt, self.trainModel.pos_r: batch_pr,
-									 self.trainModel.neg_h: batch_nh, self.trainModel.neg_t: batch_nt, self.trainModel.neg_r: batch_nr}
+									 self.trainModel.neg_hs: batch_nhs, self.trainModel.neg_ts: batch_nts, self.trainModel.neg_rs: batch_nrs,
+									 self.trainModel.neg_type_sims: batch_type_sims, self.trainModel.neg_rel_sims: batch_rel_sims}
 						
-						_, batch_loss = self.sess.run([self.train_op, self.trainModel.loss], feed_dict=feed_dict)
-						_loss += batch_loss
-						
-					print("step: {:04d}, loss: {:.4f}".format(step, _loss))
+						if i%2 == 0:
+							_, batch_embed_loss = self.sess.run([self.embed_train_op, self.trainModel.loss], feed_dict=feed_dict)
+							_embed_loss += batch_embed_loss
+						else:
+							_, batch_neg_loss = self.sess.run([self.neg_train_op, self.trainModel.neg_loss], feed_dict=feed_dict)
+							_neg_loss += batch_neg_loss
+					print("step: {:04d}, embed_loss: {:.4f}, neg_loss: {:.4f}".format(step, _embed_loss, _neg_loss))
 					
 					
 	def test(self):

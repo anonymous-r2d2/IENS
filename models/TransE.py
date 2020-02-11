@@ -22,6 +22,11 @@ class TransE(Model):
 		self.n_h = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_h)
 		self.n_t = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_t)
 		self.n_r = tf.nn.embedding_lookup(self.rel_embeddings, self.neg_r)
+		
+		self.n_hs = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_hs)
+		self.n_ts = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_ts)
+		self.n_rs = tf.nn.embedding_lookup(self.rel_embeddings, self.neg_rs)
+		
 
 	def add_loss(self):
 
@@ -32,9 +37,17 @@ class TransE(Model):
 		n_score =  tf.reduce_sum(_n_score, -1, keep_dims = True)
 
 		self.loss = tf.reduce_sum(tf.maximum(p_score - n_score + self.margin, 0))
+		
+	def add_neg_loss(self):
+	
+		_ns_score = self._calc(self.n_hs, self.n_ts, self.n_rs)
+		ns_score = tf.nn.softmax(tf.reduce_sum(_ns_score, -1), axis = -1)
+		
+		self.neg_loss = tf.reduce_mean(tf.reduce_sum(tf.abs(self.neg_sim - ns_score), axis = -1))
+		
 
 	def add_predict(self):
-		print(self.p_h.shape)
-		print(self._calc(self.p_h, self.p_t, self.p_r).shape)
-		print(tf.reduce_sum(self._calc(self.p_h, self.p_t, self.p_r), -1, keep_dims = False).shape)
+		# print(self.p_h.shape)
+		# print(self._calc(self.p_h, self.p_t, self.p_r).shape)
+		# print(tf.reduce_sum(self._calc(self.p_h, self.p_t, self.p_r), -1, keep_dims = False).shape)
 		self.predict = tf.reduce_sum(self._calc(self.p_h, self.p_t, self.p_r), -1, keep_dims = False)
