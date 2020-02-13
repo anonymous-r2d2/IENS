@@ -202,6 +202,7 @@ class DataHelper(object):
             tail_rel_sim = (float)(np.sum(self.tail_rel[t] & self.tail_rel[i])) / \
                            (float)(np.sum(self.tail_rel[t] | self.tail_rel[i])) * \
                            (self.theta + indicate) / (self.theta + 1.0)
+            sim = self.theta * type_sim + (1.0 - self.theta) * tail_rel_sim
             tmp_neg_samples.append((h, i, r, type_sim, tail_rel_sim))
         return tmp_neg_samples
     
@@ -224,6 +225,28 @@ class DataHelper(object):
         :return:
         '''
         self.train_neg_triples = []
+        self.test_neg_triples = []
+        self.valid_neg_triples = []
+        
+        if self.read_neg_samples:
+            rf = codecs.open(os.path.join(self.data_path, 'neg_train2id.txt'), 'r', encoding='utf8')
+            for line in rf:
+                h, t, r = line.strip().split()
+                self.train_neg_triples.append((h, t, r))
+            rf.close()
+            
+            rf = codecs.open(os.path.join(self.data_path, 'neg_test2id.txt'), 'r', encoding='utf8')
+            for line in rf:
+                h, t, r = line.strip().split()
+                self.test_neg_triples.append((h, t, r))
+            rf.close()
+            
+            rf = codecs.open(os.path.join(self.data_path, 'neg_valid2id.txt'), 'r', encoding='utf8')
+            for line in rf:
+                h, t, r = line.strip().split()
+                self.valid_neg_triples.append((h, t, r))
+            rf.close()
+            return
         
         for h, t, r in self.train_pos_triples:
             # s = time.time()

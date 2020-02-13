@@ -19,7 +19,7 @@ flags.DEFINE_string('save_path', '../res/paper/kg_video/transe', 'path of save m
 flags.DEFINE_integer('embed_dim', 100, 'embedding dimension')
 flags.DEFINE_integer('batch_size', 4096, 'batch size')
 flags.DEFINE_float('lr', 0.001, 'learning rate')
-flags.DEFINE_integer('neg_num', 1, 'negative num')
+flags.DEFINE_integer('neg_num', 10, 'negative num')
 flags.DEFINE_string('neg_mode', 'dynamic', 'negatvie sampling mode')
 flags.DEFINE_float('lmbda', 0.01, 'lmbda')
 flags.DEFINE_float('margin', 1.0, 'margin')

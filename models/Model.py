@@ -20,6 +20,9 @@ class Model(object):
 
 		self.data_path = config.data_path
 
+		self.batch_size = config.batch_size
+		self.neg_mode = config.neg_mode
+
 		self.ent_num = config.ent_num
 		self.rel_num = config.rel_num
 		self.neg_num = config.neg_num
@@ -27,6 +30,7 @@ class Model(object):
 	
 		self.embed_dim = config.embed_dim
 		self.margin = config.margin
+		self.lmbda = config.lmbda
 	
 		with tf.name_scope("input"):
 			self.add_input()
@@ -53,15 +57,15 @@ class Model(object):
 
 		:return:
 		'''
-		self.pos_h = tf.placeholder(tf.int32, [None])
-		self.pos_t = tf.placeholder(tf.int32, [None])
-		self.pos_r = tf.placeholder(tf.int32, [None])
+		self.pos_h = tf.placeholder(tf.int32, [self.batch_size])
+		self.pos_t = tf.placeholder(tf.int32, [self.batch_size])
+		self.pos_r = tf.placeholder(tf.int32, [self.batch_size])
 
-		self.neg_hs = tf.placeholder(tf.int32, [None, self.neg_num])
-		self.neg_ts = tf.placeholder(tf.int32, [None, self.neg_num])
-		self.neg_rs = tf.placeholder(tf.int32, [None, self.neg_num])
-		self.neg_type_sims = tf.placeholder(tf.float32, [None, self.neg_num, 1])
-		self.neg_rel_sims = tf.placeholder(tf.float32, [None, self.neg_num, 1])
+		self.neg_hs = tf.placeholder(tf.int32, [self.batch_size, self.neg_num])
+		self.neg_ts = tf.placeholder(tf.int32, [self.batch_size, self.neg_num])
+		self.neg_rs = tf.placeholder(tf.int32, [self.batch_size, self.neg_num])
+		self.neg_type_sims = tf.placeholder(tf.float32, [self.batch_size, self.neg_num])
+		self.neg_rel_sims = tf.placeholder(tf.float32, [self.batch_size, self.neg_num])
 
 		# self.ent_type = tf.placeholder(tf.int32, [None, self.type_num])
 		# self.co_rel = tf.placeholder(tf.int32, [None, self.rel_num])
@@ -71,18 +75,22 @@ class Model(object):
 
 		:return:
 		'''
-		sim_input = tf.concat([self.neg_type_sims, self.neg_rel_sims], -1)
-		neg_fc1 = tf.layers.dense(sim_input, units=32, activation=tf.nn.relu, name='neg_fc1')
-		neg_sim = tf.layers.dense(neg_fc1, units=1, activation=tf.nn.relu, name='neg_fc2')
-		self.neg_sim = tf.reduce_mean(neg_sim, -1)
-		
-		neg_idx_0 = tf.reshape(np.arange(0, self.neg_num), [-1, 1])
-		neg_idx_1 = tf.reshape(tf.argmax(neg_sim, -1), [-1, 1])
+		if self.neg_mode == 'dynamic':
+			sim_input = tf.concat([tf.expand_dims(self.neg_type_sims, -1), tf.expand_dims(self.neg_rel_sims, -1)], -1)
+			neg_fc1 = tf.layers.dense(sim_input, units=32, activation=tf.nn.relu, name='neg_fc1')
+			neg_sim = tf.layers.dense(neg_fc1, units=1, activation=tf.nn.relu, name='neg_fc2')
+			self.neg_sim = tf.reduce_mean(neg_sim, -1)
+		else:
+			self.neg_sim = self.config.theta * self.neg_type_sims + (1.0 - self.config.theta) * self.neg_rel_sims
+			print('neg_sim', self.neg_sim.shape)
+		neg_idx_0 = tf.reshape(np.arange(0, self.batch_size), [-1, 1])
+		neg_idx_1 = tf.reshape(tf.argmax(self.neg_sim, -1), [-1, 1])
 		neg_idx = tf.concat([neg_idx_0, neg_idx_1], -1)
-		
 		self.neg_h = tf.gather_nd(self.neg_hs, neg_idx)
 		self.neg_t = tf.gather_nd(self.neg_ts, neg_idx)
 		self.neg_r = tf.gather_nd(self.neg_rs, neg_idx)
+		
+
 
 	def add_embed(self):
 		'''

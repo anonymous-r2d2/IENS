@@ -255,11 +255,11 @@ class Config(object):
 		for h, t, r in self.train_pos_triples:
 			neg_sample = self.get_neg_sample(h, t, r)
 			hs, ts, rs, type_sims, rel_sims = [list(item) for item in zip(*neg_sample)]
-			self.train_nhs.append(hs)
-			self.train_nts.append(ts)
-			self.train_nrs.append(rs)
-			self.train_type_sims.append(type_sims)
-			self.train_rel_sims.append(rel_sims)
+			self.train_nhs.append(np.array(hs))
+			self.train_nts.append(np.array(ts))
+			self.train_nrs.append(np.array(rs))
+			self.train_type_sims.append(np.array(type_sims))
+			self.train_rel_sims.append(np.array(rel_sims))
 			
 
 		
@@ -321,7 +321,8 @@ class Config(object):
 					neg_var_list = [var for var in tf.trainable_variables() if 'neg' in var.name]
 					
 					self.embed_train_op = self.optimizer.minimize(self.trainModel.loss, var_list=embed_var_list)
-					self.neg_train_op = self.optimizer.minimize(self.trainModel.neg_loss, var_list=neg_var_list)
+					if self.neg_mode == 'dynamic':
+						self.neg_train_op = self.optimizer.minimize(self.trainModel.neg_loss, var_list=neg_var_list)
 					# grads_and_vars = self.optimizer.compute_gradients(self.trainModel.loss)
 					# self.train_op = self.optimizer.apply_gradients(grads_and_vars)
 					
@@ -385,36 +386,27 @@ class Config(object):
 						batch_ph = self.train_ph[i*self.batch_size: (i+1)*self.batch_size]
 						batch_pt = self.train_pt[i * self.batch_size: (i + 1) * self.batch_size]
 						batch_pr = self.train_pr[i * self.batch_size: (i + 1) * self.batch_size]
-						batch_nhs = self.train_nhs[
-									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_nts = self.train_nts[
-									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_nrs = self.train_nrs[
-									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_type_sims = self.train_type_sims[
-									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
-						batch_rel_sims = self.train_rel_sims[
-									i * self.batch_size * self.neg_num: (i + 1) * self.batch_size * self.neg_num]
+						batch_nhs = self.train_nhs[i * self.batch_size: (i + 1) * self.batch_size]
+						batch_nts = self.train_nts[i * self.batch_size: (i + 1) * self.batch_size]
+						batch_nrs = self.train_nrs[i * self.batch_size: (i + 1) * self.batch_size]
+						batch_type_sims = self.train_type_sims[i * self.batch_size: (i + 1) * self.batch_size]
+						batch_rel_sims = self.train_rel_sims[i * self.batch_size: (i + 1) * self.batch_size]
 						
-						print(batch_ph)
-						print(batch_pt)
-						print(batch_pr)
-						print(batch_nhs)
-						print(batch_nts)
-						print(batch_nrs)
-						print(batch_type_sims)
-						print(batch_rel_sims)
 						
 						feed_dict = {self.trainModel.pos_h: batch_ph, self.trainModel.pos_t: batch_pt, self.trainModel.pos_r: batch_pr,
 									 self.trainModel.neg_hs: batch_nhs, self.trainModel.neg_ts: batch_nts, self.trainModel.neg_rs: batch_nrs,
 									 self.trainModel.neg_type_sims: batch_type_sims, self.trainModel.neg_rel_sims: batch_rel_sims}
-						
-						if i%2 == 0:
-							_, batch_embed_loss = self.sess.run([self.embed_train_op, self.trainModel.loss], feed_dict=feed_dict)
-							_embed_loss += batch_embed_loss
+						if self.neg_mode == 'dynamic':
+							if step%2 == 0:
+								_, batch_embed_loss = self.sess.run([self.embed_train_op, self.trainModel.loss], feed_dict=feed_dict)
+								_embed_loss += batch_embed_loss
+							else:
+								_, batch_neg_loss = self.sess.run([self.neg_train_op, self.trainModel.neg_loss], feed_dict=feed_dict)
+								_neg_loss += batch_neg_loss
 						else:
-							_, batch_neg_loss = self.sess.run([self.neg_train_op, self.trainModel.neg_loss], feed_dict=feed_dict)
-							_neg_loss += batch_neg_loss
+							_, batch_embed_loss = self.sess.run([self.embed_train_op, self.trainModel.loss],
+																feed_dict=feed_dict)
+							_embed_loss += batch_embed_loss
 					print("step: {:04d}, embed_loss: {:.4f}, neg_loss: {:.4f}".format(step, _embed_loss, _neg_loss))
 					
 					
