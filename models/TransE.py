@@ -40,19 +40,10 @@ class TransE(Model):
 		
 	def add_neg_loss(self):
 		_ns_score = self._calc(self.n_hs, self.n_ts, self.n_rs)
-		print('shape:')
-		print(self.n_hs.shape, self.n_ts.shape, self.n_rs.shape)
-		print(_ns_score.shape)
-		print(tf.reduce_sum(_ns_score, -1).shape)
-		print(self.neg_sim.shape)
-		
 		ns_score = tf.nn.softmax(tf.reduce_sum(_ns_score, -1), axis = -1)
+		
 		neg_sim = tf.nn.softmax(self.neg_sim, axis = -1)
-		
-		print(ns_score.shape)
-		print(neg_sim.shape)
-		
-		self.neg_loss = tf.reduce_mean(tf.reduce_sum(tf.abs(neg_sim - ns_score), axis = -1))
+		self.neg_loss = tf.reduce_mean(tf.reduce_sum(neg_sim * ns_score, axis=-1))
 		
 
 	def add_predict(self):

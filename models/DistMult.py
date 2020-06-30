@@ -47,7 +47,8 @@ class DistMult(Model):
 		_ns_score = self._calc(self.n_hs, self.n_ts, self.n_rs)
 		ns_score = tf.nn.softmax(tf.reduce_sum(_ns_score, -1), axis=-1)
 		
-		self.neg_loss = tf.reduce_mean(tf.reduce_sum(tf.abs(self.neg_sim - ns_score), axis=-1))
+		neg_sim = tf.nn.softmax(self.neg_sim, axis=-1)
+		self.neg_loss = tf.reduce_mean(tf.reduce_sum(neg_sim * ns_score, axis=-1))
 
 	def predict_def(self):
 		self.predict = tf.reduce_sum(self._calc(self.p_h, self.p_t, self.p_r), -1, keep_dims = False)

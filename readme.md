@@ -1,2 +1,4 @@
 # Train
-cd ./train and run train file.
+cd ./train_models and run train file.
+
+e.g. python train_transe.py.

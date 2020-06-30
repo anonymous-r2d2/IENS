@@ -56,7 +56,8 @@ class ComplEx(Model):
 		_ns_score = self._calc(self.n1_hs, self.n2_hs, self.n1_ts, self.n2_ts, self.n1_rs, self.n2_rs)
 		ns_score = tf.nn.softmax(tf.reduce_sum(_ns_score, -1), axis=-1)
 		
-		self.neg_loss = tf.reduce_mean(tf.reduce_sum(tf.abs(self.neg_sim - ns_score), axis=-1))
+		neg_sim = tf.nn.softmax(self.neg_sim, axis=-1)
+		self.neg_loss = tf.reduce_mean(tf.reduce_sum(neg_sim * ns_score, axis=-1))
 
 	def predict_def(self):
 		self.predict = -self._calc(self.p1_h, self.p2_h, self.p1_t, self.p2_t, self.p1_r, self.p2_r)
